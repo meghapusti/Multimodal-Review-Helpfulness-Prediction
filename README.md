@@ -144,7 +144,7 @@ Raw Amazon Data (McAuley-Lab/Amazon-Reviews-2023)
 ### Run the Demo Locally
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Multimodal-Review-Helpfulness-Prediction.git
+git clone https://github.com/meghapusti/Multimodal-Review-Helpfulness-Prediction.git
 cd Multimodal-Review-Helpfulness-Prediction
 pip install -r requirements.txt
 streamlit run app.py
