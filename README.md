@@ -1,202 +1,253 @@
-# Multimodal Review Helpfulness Prediction
+<div align="center">
 
-A comprehensive machine learning system that predicts the helpfulness of Amazon product reviews using multimodal data (text, images, and metadata). This project combines natural language processing, computer vision, and traditional machine learning to provide accurate helpfulness predictions.
+# 🧠 Multimodal Review Helpfulness Prediction
 
-## Project Overview
+**Predicting Amazon review helpfulness using text, images, and metadata — fused into a single ML pipeline.**
 
-This system analyzes Amazon beauty product reviews and predicts how helpful they will be to other customers. By leveraging multiple modalities of data, the model achieves superior performance compared to text-only approaches.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.2-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.44-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![CatBoost](https://img.shields.io/badge/CatBoost-1.2.8-FFCC00?style=flat-square)](https://catboost.ai)
+[![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-FFD21F?style=flat-square&logo=huggingface&logoColor=black)](https://huggingface.co)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://multimodal-review-prediction.streamlit.app/)
 
-🌐 **[Try the Live Demo](https://multimodal-review-prediction.streamlit.app/)** - Experience the model in action!
+<br/>
 
-### Key Features
+> Built as part of the **Computational Data Science** course at **SUTD**
 
-- **Text Analysis**: BERT embeddings, sentiment analysis, readability scores
-- **Image Processing**: Deep learning-based image feature extraction  
-- **Metadata Integration**: Review ratings, purchase verification, temporal features
-- **Interactive Web App**: Streamlit-based interface for real-time predictions
+</div>
+
+---
+
+## 🌐 Live Demo
+
+**[→ Try the deployed app on Streamlit Cloud](https://multimodal-review-prediction.streamlit.app/)**
+
+No setup required — select a sample review, explore its extracted features, and get an instant helpfulness prediction.
+
+---
+
+## Overview
+
+When shoppers read Amazon reviews, some reviews feel genuinely useful while others don't land. What makes a review helpful? Is it how the reviewer writes? Whether they included photos? Their rating relative to the product's average?
+
+This project builds an end-to-end ML system that answers exactly that question. Using the **Amazon Reviews 2023 dataset** (All Beauty category), the pipeline ingests raw review text, user-uploaded images, and product metadata — extracts rich multimodal features — and trains a gradient-boosted model to predict a continuous helpfulness score.
+
+The key insight: **text alone isn't enough.** By fusing BERT language embeddings with ResNet/CLIP image embeddings and hand-engineered metadata features, this system substantially outperforms text-only baselines.
+
+---
 
 ## Architecture
 
-The system uses a multi-stage pipeline:
+```
+Raw Amazon Data (McAuley-Lab/Amazon-Reviews-2023)
+        │
+        ▼
+┌───────────────────────────────────────────────────────┐
+│                  Data Preprocessing                    │
+│  • Text cleaning (lemmatization, stopword removal)     │
+│  • Image URL extraction & quality scoring             │
+│  • Metadata merging (reviews ↔ product metadata)      │
+│  • Helpfulness score normalization (log-scaled 0–1)   │
+└───────────────────────┬───────────────────────────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+  ┌──────────┐   ┌──────────────┐  ┌──────────────┐
+  │   TEXT   │   │    IMAGE     │  │   METADATA   │
+  │          │   │              │  │              │
+  │ BERT     │   │ CLIP / ResNet│  │ Rating info  │
+  │ 768-dim  │   │ 512-dim      │  │ Verification │
+  │ embeddings│  │ embeddings   │  │ Temporal     │
+  │ + VADER  │   │ + quality    │  │ Product stats│
+  │ sentiment│   │   scoring    │  │              │
+  │ + readab.│   │              │  │              │
+  └────┬─────┘   └──────┬───────┘  └──────┬───────┘
+       │                │                  │
+       ▼                ▼                  │
+  PCA → 50-dim    PCA → 50-dim             │
+       │                │                  │
+       └────────────────┴──────────────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │  Feature Matrix       │
+            │  ~110-dim vector      │
+            │  (50 BERT + 50 img   │
+            │   + 10 metadata)      │
+            └───────────┬───────────┘
+                        │
+                        ▼
+            ┌───────────────────────┐
+            │  CatBoost Regressor   │
+            │  500 iterations       │
+            │  depth=6, lr=0.1     │
+            │  Early stopping      │
+            └───────────┬───────────┘
+                        │
+                        ▼
+            Helpfulness Score (0–1)
+```
 
-1. **Data Preprocessing**: Text cleaning, image processing, feature engineering
-2. **Feature Extraction**: 
-   - BERT embeddings for text semantic representation
-   - ResNet-based image embeddings
-   - Handcrafted text features (sentiment, readability, length)
-   - Metadata features (ratings, purchase verification, etc.)
-3. **Dimensionality Reduction**: PCA for both text and image embeddings
-4. **Model Training**: CatBoost regressor for final prediction
-5. **Deployment**: Streamlit web application
+---
+
+## Features
+
+### Text Features
+| Feature | Method |
+|---|---|
+| Semantic embeddings | BERT (`bert-base-uncased`) — 768-dim, mean-pooled |
+| Sentiment score | VADER (`SentimentIntensityAnalyzer`) compound score |
+| Readability | Flesch Reading Ease (`textstat`) |
+| Review length | Word count of cleaned text |
+| Punctuation count | Period count as proxy for sentence structure |
+
+### Image Features
+| Feature | Method |
+|---|---|
+| Visual embeddings | CLIP (`openai/clip-vit-base-patch32`) — 512-dim |
+| Image quality score | Custom metric: Laplacian blur + Sobel sharpness + brightness (weighted composite) |
+| Parallel processing | `ThreadPoolExecutor` for concurrent image URL fetching |
+
+### Metadata Features
+| Feature | Description |
+|---|---|
+| `verified_purchase` | Binary flag for verified buyers |
+| `average_rating` | Product's mean rating across all reviews |
+| `rating_number` | Total number of ratings on the product |
+| `rating_deviation` | Reviewer's rating minus product average (engineered feature) |
+| `days_since_review` | Temporal feature — age of review |
+| `avg_quality_score` | Mean image quality score across all review images |
+
+---
 
 ## Project Structure
 
 ```
-├── app.py                      # Streamlit web application
-├── data_clean.py              # Data preprocessing and cleaning
-├── data_preprocessing.ipynb   # Feature engineering notebook
-├── final.ipynb               # Model training and evaluation
-├── requirements.txt          # Python dependencies
-├── sample_reviews.csv        # Sample dataset for demo
-├── catboost_model.cbm       # Trained CatBoost model
-├── bert_pca.pkl             # PCA model for BERT embeddings
-├── img_pca.pkl              # PCA model for image embeddings
-└── scaler.pkl               # Feature scaler
+.
+├── app.py                      # Streamlit web application (inference + UI)
+├── data_clean.py               # Initial data loading & cleaning pipeline
+├── data_preprocessing.ipynb    # Feature engineering (BERT, CLIP, image quality)
+├── final.ipynb                 # Model training, evaluation & artifact export
+├── requirements.txt            # All Python dependencies (pinned versions)
+├── sample_reviews.csv          # Pre-processed sample data for demo
+├── catboost_model.cbm          # Trained CatBoost model (serialized)
+├── bert_pca.pkl                # Fitted PCA transformer for BERT embeddings
+├── img_pca.pkl                 # Fitted PCA transformer for image embeddings
+└── scaler.pkl                  # Fitted StandardScaler for metadata features
 ```
 
-## Installation
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd Multimodal-Review-Helpfulness-Prediction
-   ```
+## Quickstart
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Download NLTK data** (if running data preprocessing)
-   ```python
-   import nltk
-   nltk.download('punkt')
-   nltk.download('stopwords')
-   nltk.download('wordnet')
-   nltk.download('vader_lexicon')
-   ```
-
-## Usage
-
-### Try the Live Demo
-
-**[Access the deployed application](https://multimodal-review-prediction.streamlit.app/)** - No setup required!
-
-### Running the Web Application Locally
+### Run the Demo Locally
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/Multimodal-Review-Helpfulness-Prediction.git
+cd Multimodal-Review-Helpfulness-Prediction
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
-This launches an interactive web interface where you can:
-- Select from sample reviews
-- View extracted features (text analysis, metadata, image info)
-- Get real-time helpfulness predictions
-- Explore the model's decision-making process
+The app loads all pre-trained artifacts (`catboost_model.cbm`, `*.pkl`) and runs inference directly — no retraining needed.
 
-### Training Your Own Model
+### Retrain from Scratch
 
-1. **Data Preprocessing**
-   ```bash
-   python data_clean.py
-   ```
+**1. Load & clean the data**
+```bash
+python data_clean.py
+```
+Connects to Hugging Face Datasets, loads `McAuley-Lab/Amazon-Reviews-2023` (All Beauty), handles missing values, normalizes helpfulness scores, and saves train/test CSVs.
 
-2. **Feature Engineering**
-   Open and run `data_preprocessing.ipynb` to extract:
-   - BERT embeddings using DistilBERT
-   - Image features using ResNet
-   - Text quality metrics (sentiment, readability)
-   - Temporal and metadata features
+**2. Extract multimodal features**
 
-3. **Model Training**
-   Open and run `final.ipynb` to:
-   - Apply PCA dimensionality reduction
-   - Train the CatBoost regressor
-   - Evaluate model performance
-   - Save trained models
+Open and run `data_preprocessing.ipynb`. This notebook:
+- Downloads BERT and CLIP model weights from Hugging Face
+- Extracts 768-dim BERT embeddings from cleaned review text
+- Downloads review images and extracts 512-dim CLIP embeddings
+- Computes image quality scores (blur, sharpness, brightness)
+- Engineers metadata and temporal features
+- Saves the complete feature-rich dataframe
 
-## Features Used
+**3. Train the model**
 
-### Text Features
-- **BERT Embeddings**: 768-dimensional semantic representations
-- **Sentiment Score**: VADER sentiment analysis
-- **Readability**: Flesch reading ease score
-- **Review Length**: Word count and character count
-- **Punctuation Count**: Number of punctuation marks
+Open and run `final.ipynb`. This notebook:
+- Applies PCA (50 components each) to BERT and image embeddings
+- Standard-scales all metadata features
+- Log-transforms the helpfulness target to handle skew
+- Trains a CatBoost regressor with early stopping
+- Evaluates on held-out test set (MSE, MAE, R², Pearson r)
+- Serializes all model artifacts for deployment
 
-### Image Features
-- **Deep Learning Embeddings**: ResNet-based feature extraction
-- **Visual Content Analysis**: Automated image quality assessment
+---
 
-### Metadata Features
-- **Rating Information**: Review rating, average product rating, rating deviation
-- **Verification**: Verified purchase status
-- **Temporal**: Days since review was posted
-- **Product Metrics**: Average quality score, total number of ratings
-- **Category**: Product main category
+## Model Details
 
-## Model Performance
+### CatBoost Regressor Configuration
+```python
+CatBoostRegressor(
+    iterations=500,
+    depth=6,
+    learning_rate=0.1,
+    random_seed=42,
+    early_stopping_rounds=50,
+    task_type='CPU'
+)
+```
 
-The system uses CatBoost (Categorical Boosting) as the final predictor, which is particularly effective for:
-- Handling categorical features
-- Avoiding overfitting
-- Providing interpretable results
-- Fast training and inference
+### Target Engineering
+Raw `helpful_vote` counts are highly skewed (most reviews have 0–5 votes; a few have hundreds). A log-transform is applied before normalization:
 
-Key evaluation metrics:
-- Mean Squared Error (MSE)
-- Mean Absolute Error (MAE)
-- R² Score
-- Pearson Correlation
+```python
+y = log1p(helpful_vote) / log1p(max_votes)   # maps to [0, 1]
+```
 
-## Technical Details
+This prevents the model from being dominated by outlier high-vote reviews.
 
-### Data Pipeline
-1. **Raw Data**: Amazon Reviews 2023 dataset (All Beauty category)
-2. **Preprocessing**: Text cleaning, image processing, missing value handling
-3. **Feature Engineering**: Multi-modal feature extraction
-4. **Normalization**: Standard scaling for numerical features
-5. **Dimensionality Reduction**: PCA for high-dimensional embeddings
+### Evaluation Metrics
+- **MSE** — Mean Squared Error
+- **MAE** — Mean Absolute Error
+- **R²** — Coefficient of determination
+- **Pearson r** — Linear correlation between predictions and ground truth
 
-### Model Architecture
-- **Base Model**: CatBoost Regressor
-- **Input Features**: ~300+ dimensional feature vector
-- **Output**: Continuous helpfulness score (0-1 range)
-- **Training**: Gradient boosting with categorical feature support
+---
 
-### Preprocessing Steps
-- Text normalization and cleaning
-- BERT tokenization and embedding extraction
-- Image resizing and feature extraction
-- Temporal feature engineering
-- Cross-validation for robust evaluation
+## Tech Stack
 
-## Results
+| Category | Libraries |
+|---|---|
+| **Deep Learning** | `torch`, `transformers`, `sentence-transformers` |
+| **ML / Gradient Boosting** | `catboost`, `scikit-learn` |
+| **NLP** | `nltk` (VADER, lemmatizer, tokenizer), `textstat` |
+| **Computer Vision** | `opencv-python`, `scikit-image`, `Pillow` |
+| **Data** | `pandas`, `numpy`, `datasets` (HuggingFace) |
+| **Dimensionality Reduction** | `sklearn.decomposition.PCA` |
+| **Web App** | `streamlit` |
+| **Visualization** | `matplotlib`, `seaborn`, `plotly` |
+| **Parallelism** | `concurrent.futures.ThreadPoolExecutor` |
 
-The multimodal approach significantly outperforms text-only baselines by incorporating:
-- Visual information from product/review images
-- Rich semantic representations from BERT
-- Comprehensive metadata analysis
-- Temporal dynamics of review helpfulness
+---
 
-## Dependencies
+## Dataset
 
-Key libraries:
-- **Machine Learning**: scikit-learn, catboost, numpy, pandas
-- **Deep Learning**: torch, transformers, sentence-transformers
-- **NLP**: nltk, textstat
-- **Computer Vision**: opencv-python, scikit-image
-- **Web App**: streamlit
-- **Visualization**: matplotlib, seaborn, plotly
+**[Amazon Reviews 2023](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023)** — McAuley Lab, UCSD
 
-## Contributing
+- Category: **All Beauty**
+- Filtered to reviews with: at least 1 helpful vote, non-empty text, at least 1 attached image
+- Merged with product metadata on `parent_asin`
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+---
+
+## Acknowledgements
+
+- [McAuley Lab](https://cseweb.ucsd.edu/~jmcauley/) for the Amazon Reviews 2023 dataset
+- [Hugging Face](https://huggingface.co) for BERT, CLIP, and the Datasets library
+- [CatBoost / Yandex](https://catboost.ai) for the gradient boosting framework
+- Built as part of the **Computational Data Science** course at [SUTD](https://www.sutd.edu.sg/)
+
+---
 
 ## License
 
 This project is for educational and research purposes.
-
-## Acknowledgments
-
-- Amazon Reviews 2023 dataset by McAuley Lab
-- Hugging Face for transformer models
-- CatBoost team for the gradient boosting implementation
-
----
-
-*Built as part of the Computational Data Science course at SUTD*
